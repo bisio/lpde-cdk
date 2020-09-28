@@ -3,9 +3,10 @@ import * as lambda from '@aws-cdk/aws-lambda';
 import * as apigw from '@aws-cdk/aws-apigateway';
 import * as sqs from '@aws-cdk/aws-sqs';
 import { SqsEventSource } from '@aws-cdk/aws-lambda-event-sources';
-import { Duration } from '@aws-cdk/core';
+import { Duration, RemovalPolicy } from '@aws-cdk/core';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as ssm from '@aws-cdk/aws-ssm';
+import { BucketDeployment, Source } from '@aws-cdk/aws-s3-deployment';
 
 
 export class LpdeCdkStack extends cdk.Stack {
@@ -13,23 +14,30 @@ export class LpdeCdkStack extends cdk.Stack {
     super(scope, id, props);
 
     const templateBucket = new s3.Bucket(this, 'templateBucket');
-
+    templateBucket.policy?.applyRemovalPolicy(RemovalPolicy.DESTROY);
+    
     const publicDocumentsBucket = new s3.Bucket(this, 'publicDocumentsBucket');
+    publicDocumentsBucket.policy?.applyRemovalPolicy(RemovalPolicy.DESTROY);
 
     publicDocumentsBucket.grantPublicAccess();
 
+    new BucketDeployment(this, 'templateDeployment', {
+      sources: [ Source.asset('./templates')],
+      destinationBucket: templateBucket
+    });
 
-    const mailChimpKey  = ssm.StringParameter.fromStringParameterAttributes(this, 'MailChimpKey', {
+
+    const mailChimpKey = ssm.StringParameter.fromStringParameterAttributes(this, 'MailChimpKey', {
       parameterName: '/mailchimp/ApiKey',
       version: 2,
-  }).stringValue; 
+    }).stringValue;
 
-  const mailChimpListId  = ssm.StringParameter.fromStringParameterAttributes(this, 'mailChimpListId', {
-    parameterName: '/mailchimp/ListId',
-    version: 1,
-  }).stringValue; 
+    const mailChimpListId = ssm.StringParameter.fromStringParameterAttributes(this, 'mailChimpListId', {
+      parameterName: '/mailchimp/ListId',
+      version: 1,
+    }).stringValue;
 
-    const cloudMersiveKey = ssm.StringParameter.fromStringParameterAttributes(this, 'ColudMersiveKey',{
+    const cloudMersiveKey = ssm.StringParameter.fromStringParameterAttributes(this, 'ColudMersiveKey', {
       parameterName: '/cloudmersive/ApiKey',
       version: 1
     }).stringValue;
@@ -55,11 +63,11 @@ export class LpdeCdkStack extends cdk.Stack {
       environment: {
         QUEUE_NAME: documentQueue.queueName,
         MAIL_CHIMP_KEY: mailChimpKey,
-        MAIL_CHIMP_LIST_ID: mailChimpListId 
+        MAIL_CHIMP_LIST_ID: mailChimpListId
       }
     });
 
-    const mailChimpProcessDocument = new lambda.Function(this, 'MailChimpDocHandler',{
+    const mailChimpProcessDocument = new lambda.Function(this, 'MailChimpDocHandler', {
       runtime: lambda.Runtime.NODEJS_12_X,
       code: lambda.Code.fromAsset('lambda'),
       handler: 'mailchimp-doc.handler',
