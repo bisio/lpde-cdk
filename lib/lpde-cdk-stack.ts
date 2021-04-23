@@ -1,4 +1,5 @@
 import * as cdk from '@aws-cdk/core';
+import * as iam from '@aws-cdk/aws-iam';
 import * as lambda from '@aws-cdk/aws-lambda';
 import * as apigw from '@aws-cdk/aws-apigateway';
 import * as sqs from '@aws-cdk/aws-sqs';
@@ -6,6 +7,7 @@ import { SqsEventSource } from '@aws-cdk/aws-lambda-event-sources';
 import { Duration, RemovalPolicy } from '@aws-cdk/core';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as ssm from '@aws-cdk/aws-ssm';
+import * as sfn from '@aws-cdk/aws-stepfunctions';
 import { BucketDeployment, Source } from '@aws-cdk/aws-s3-deployment';
 
 
@@ -53,6 +55,17 @@ export class LpdeCdkStack extends cdk.Stack {
       }
     });
 
+    const mailchimpMembers = new lambda.Function(this, 'MailChimpMembersHanlder', {
+      runtime: lambda.Runtime.NODEJS_12_X,
+      code: lambda.Code.fromAsset('lambda'),
+      handler: 'mailchimp-list-members.handler',
+      timeout: Duration.seconds(3),
+      environment: {
+        MAIL_CHIMP_KEY: mailChimpKey,
+        MAIL_CHIMP_LIST_ID: mailChimpListId
+      }
+    });
+
     const documentQueue = new sqs.Queue(this, 'DocumentQueue');
 
     const mailChimpMerge = new lambda.Function(this, 'MailChimpMergeHandler', {
@@ -79,6 +92,20 @@ export class LpdeCdkStack extends cdk.Stack {
       }
     });
 
+    const mailChimpFindMembers = new lambda.Function(this, 'MailChimpFindMembersHandler',{
+      runtime: lambda.Runtime.PYTHON_3_7,
+      code: lambda.Code.fromAsset('find_members'),
+      handler: 'find_members.lambda_handler',
+      timeout: Duration.seconds(10)
+    });
+
+    const searchForName = new lambda.Function(this, 'SearchForNameHandler', {
+      runtime: lambda.Runtime.NODEJS_12_X,
+      code: lambda.Code.fromAsset('lambda'),
+      handler: 'search-for-name.handler',
+      timeout: Duration.seconds(3),
+    })
+
     documentQueue.grantSendMessages(mailChimpMerge);
 
     templateBucket.grantReadWrite(mailChimpProcessDocument);
@@ -88,13 +115,30 @@ export class LpdeCdkStack extends cdk.Stack {
       batchSize: 2
     }));
 
-    new apigw.LambdaRestApi(this, 'MailChimpSegmentsHandlerEndpoint', {
-      handler: mailchimpSegments
-    });
+    const mailchimpApi =  new apigw.RestApi(this, 'mailchimp-api');
+    
+    const segments = mailchimpApi.root.addResource('segments');
+    segments.addMethod('GET', new apigw.LambdaIntegration(mailchimpSegments));
+    const segment = segments.addResource('{segment_id}');
+    const members = segment.addResource('members');
+    members.addMethod('GET', new apigw.LambdaIntegration(mailchimpMembers));      
 
-    new apigw.LambdaRestApi(this, 'MailChimpMergeHandlerEndpoint', {
-      handler: mailChimpMerge
-    });
+    const by_name =  segments.addResource("by_name");
+    const segmentName = by_name.addResource('{segmentName}');
+    const membersBySegmentName = segmentName.addResource('members');
 
+    membersBySegmentName.addMethod('GET', new apigw.LambdaIntegration(mailChimpFindMembers));
+
+    const findMembersOrch1 = sfn.StateMachine.fromStateMachineArn(
+      this,
+      'FinMembersOrch1',
+      'arn:aws:states:eu-south-1:328697909738:stateMachine:FindMembersOrch-1'
+    );    
+    findMembersOrch1.grantExecution(mailChimpFindMembers,"states:StartSyncExecution");
+    mailChimpFindMembers.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      resources: [findMembersOrch1.stateMachineArn],
+      actions: ['states:StartSyncExecution']
+    }))
   }
 }

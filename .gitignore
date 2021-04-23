@@ -13,3 +13,4 @@ cdk.out
 
 # include stuff in lambda
 !lambda/*.js
+.vscode

@@ -1,7 +1,6 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event) {
-    console.log(event);
     let listId = process.env.MAIL_CHIMP_LIST_ID;
     let host   = 'us8.api.mailchimp.com';
     let path   = `/3.0/lists/${listId}/segments/`;
@@ -25,8 +24,14 @@ exports.handler = async function(event) {
         }
     });
 
-    return {
-        statusCode: 200,
-        body: JSON.stringify({segments: segments})
-    } 
+
+    if (event.httpMethod) {
+        return {
+            statusCode: 200,
+            body: JSON.stringify({segments: segments})
+        } 
+    } else {
+        return  segments 
+    }
+
 }
