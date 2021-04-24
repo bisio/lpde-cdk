@@ -8,6 +8,8 @@ import { Duration, RemovalPolicy } from '@aws-cdk/core';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as ssm from '@aws-cdk/aws-ssm';
 import * as sfn from '@aws-cdk/aws-stepfunctions';
+import * as tasks from '@aws-cdk/aws-stepfunctions-tasks';
+import * as logs  from '@aws-cdk/aws-logs';
 import { BucketDeployment, Source } from '@aws-cdk/aws-s3-deployment';
 
 
@@ -133,12 +135,50 @@ export class LpdeCdkStack extends cdk.Stack {
       this,
       'FinMembersOrch1',
       'arn:aws:states:eu-south-1:328697909738:stateMachine:FindMembersOrch-1'
-    );    
-    findMembersOrch1.grantExecution(mailChimpFindMembers,"states:StartSyncExecution");
+    );
+
+    //findMembersOrch1.grantExecution(mailChimpFindMembers,"states:StartSyncExecution");
+
     mailChimpFindMembers.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       resources: [findMembersOrch1.stateMachineArn],
       actions: ['states:StartSyncExecution']
-    }))
+    }));
+
+
+    const listSegmentsStage =  new tasks.LambdaInvoke(this, 'ListSegmentsStage', {
+      lambdaFunction: mailchimpSegments,
+      payloadResponseOnly: true,
+      resultPath: '$.segments' 
+    });
+
+    const searchForNameStage = new tasks.LambdaInvoke(this, 'SearchForNameStage', {
+      lambdaFunction: searchForName,
+      payloadResponseOnly: true,
+      resultPath: '$.choosenSegment'
+    });
+
+    const getMembersStage = new tasks.LambdaInvoke(this, 'GetMembersStage',{
+      lambdaFunction: mailchimpMembers,
+      payloadResponseOnly: true,
+      inputPath: '$.choosenSegment'
+    });
+
+    const definition = listSegmentsStage
+                      .next(searchForNameStage)
+                      .next(getMembersStage);
+    
+
+    const logGroup = new logs.LogGroup(this, 'MyLogGroup');
+    const findMembersOrch2 = new sfn.StateMachine(this, 'FindMembersOrch2', {
+       stateMachineType: sfn.StateMachineType.EXPRESS,
+       definition: definition,
+       logs: {
+        destination: logGroup,
+        level: sfn.LogLevel.ALL,
+      }
+    });
+
+
   }
 }
