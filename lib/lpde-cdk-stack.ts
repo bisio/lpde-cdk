@@ -17,18 +17,18 @@ export class LpdeCdkStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const templateBucket = new s3.Bucket(this, 'templateBucket');
-    templateBucket.policy?.applyRemovalPolicy(RemovalPolicy.DESTROY);
+    // const templateBucket = new s3.Bucket(this, 'templateBucket');
+    // templateBucket.policy?.applyRemovalPolicy(RemovalPolicy.DESTROY);
     
-    const publicDocumentsBucket = new s3.Bucket(this, 'publicDocumentsBucket');
-    publicDocumentsBucket.policy?.applyRemovalPolicy(RemovalPolicy.DESTROY);
+    // const publicDocumentsBucket = new s3.Bucket(this, 'publicDocumentsBucket');
+    // publicDocumentsBucket.policy?.applyRemovalPolicy(RemovalPolicy.DESTROY);
 
-    publicDocumentsBucket.grantPublicAccess();
+    // publicDocumentsBucket.grantPublicAccess();
 
-    new BucketDeployment(this, 'templateDeployment', {
-      sources: [ Source.asset('./templates')],
-      destinationBucket: templateBucket
-    });
+    // new BucketDeployment(this, 'templateDeployment', {
+    //   sources: [ Source.asset('./templates')],
+    //   destinationBucket: templateBucket
+    // });
 
 
     const mailChimpKey = ssm.StringParameter.fromStringParameterAttributes(this, 'MailChimpKey', {
@@ -41,10 +41,10 @@ export class LpdeCdkStack extends cdk.Stack {
       version: 1,
     }).stringValue;
 
-    const cloudMersiveKey = ssm.StringParameter.fromStringParameterAttributes(this, 'ColudMersiveKey', {
-      parameterName: '/cloudmersive/ApiKey',
-      version: 1
-    }).stringValue;
+    // const cloudMersiveKey = ssm.StringParameter.fromStringParameterAttributes(this, 'ColudMersiveKey', {
+    //   parameterName: '/cloudmersive/ApiKey',
+    //   version: 1
+    // }).stringValue;
 
     const mailchimpSegments = new lambda.Function(this, 'MailChimpSegmentsHandler', {
       runtime: lambda.Runtime.NODEJS_12_X,
@@ -70,29 +70,29 @@ export class LpdeCdkStack extends cdk.Stack {
 
     const documentQueue = new sqs.Queue(this, 'DocumentQueue');
 
-    const mailChimpMerge = new lambda.Function(this, 'MailChimpMergeHandler', {
-      runtime: lambda.Runtime.NODEJS_12_X,
-      code: lambda.Code.fromAsset('lambda'),
-      handler: 'mailchimp-merge.handler',
-      timeout: Duration.seconds(3),
-      environment: {
-        QUEUE_NAME: documentQueue.queueName,
-        MAIL_CHIMP_KEY: mailChimpKey,
-        MAIL_CHIMP_LIST_ID: mailChimpListId
-      }
-    });
+    // const mailChimpMerge = new lambda.Function(this, 'MailChimpMergeHandler', {
+    //   runtime: lambda.Runtime.NODEJS_12_X,
+    //   code: lambda.Code.fromAsset('lambda'),
+    //   handler: 'mailchimp-merge.handler',
+    //   timeout: Duration.seconds(3),
+    //   environment: {
+    //     QUEUE_NAME: documentQueue.queueName,
+    //     MAIL_CHIMP_KEY: mailChimpKey,
+    //     MAIL_CHIMP_LIST_ID: mailChimpListId
+    //   }
+    // });
 
-    const mailChimpProcessDocument = new lambda.Function(this, 'MailChimpDocHandler', {
-      runtime: lambda.Runtime.NODEJS_12_X,
-      code: lambda.Code.fromAsset('lambda'),
-      handler: 'mailchimp-doc.handler',
-      timeout: Duration.seconds(30),
-      environment: {
-        TEMPLATES_BUCKET_NAME: templateBucket.bucketName,
-        OUTPUT_BUCKET_NAME: publicDocumentsBucket.bucketName,
-        CLOUDMERSIVE_API_KEY: cloudMersiveKey
-      }
-    });
+    // const mailChimpProcessDocument = new lambda.Function(this, 'MailChimpDocHandler', {
+    //   runtime: lambda.Runtime.NODEJS_12_X,
+    //   code: lambda.Code.fromAsset('lambda'),
+    //   handler: 'mailchimp-doc.handler',
+    //   timeout: Duration.seconds(30),
+    //   environment: {
+    //     TEMPLATES_BUCKET_NAME: templateBucket.bucketName,
+    //     OUTPUT_BUCKET_NAME: publicDocumentsBucket.bucketName,
+    //     CLOUDMERSIVE_API_KEY: cloudMersiveKey
+    //   }
+    // });
 
     const mailChimpFindMembers = new lambda.Function(this, 'MailChimpFindMembersHandler',{
       runtime: lambda.Runtime.PYTHON_3_7,
@@ -108,14 +108,14 @@ export class LpdeCdkStack extends cdk.Stack {
       timeout: Duration.seconds(3),
     })
 
-    documentQueue.grantSendMessages(mailChimpMerge);
+    // documentQueue.grantSendMessages(mailChimpMerge);
 
-    templateBucket.grantReadWrite(mailChimpProcessDocument);
-    publicDocumentsBucket.grantReadWrite(mailChimpProcessDocument);
+    // templateBucket.grantReadWrite(mailChimpProcessDocument);
+    // publicDocumentsBucket.grantReadWrite(mailChimpProcessDocument);
 
-    mailChimpProcessDocument.addEventSource(new SqsEventSource(documentQueue, {
-      batchSize: 2
-    }));
+    // mailChimpProcessDocument.addEventSource(new SqsEventSource(documentQueue, {
+    //   batchSize: 2
+    // }));
 
     const mailchimpApi =  new apigw.RestApi(this, 'mailchimp-api');
     
@@ -178,7 +178,6 @@ export class LpdeCdkStack extends cdk.Stack {
         level: sfn.LogLevel.ALL,
       }
     });
-
 
   }
 }
