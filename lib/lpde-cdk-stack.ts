@@ -56,13 +56,6 @@ export class LpdeCdkStack extends cdk.Stack {
       timeout: Duration.seconds(3),
     })
 
-    const findMembersOrch1 = sfn.StateMachine.fromStateMachineArn(
-      this,
-      'FinMembersOrch1',
-      'arn:aws:states:eu-south-1:328697909738:stateMachine:FindMembersOrch-1'
-    );
-
-    //findMembersOrch1.grantExecution(mailChimpFindMembers,"states:StartSyncExecution");
 
     const listSegmentsStage =  new tasks.LambdaInvoke(this, 'ListSegmentsStage', {
       lambdaFunction: mailchimpSegments,
@@ -87,9 +80,9 @@ export class LpdeCdkStack extends cdk.Stack {
                       .next(getMembersStage);
     
 
-    const logGroup = new logs.LogGroup(this, 'MyLogGroup');
+    const logGroup = new logs.LogGroup(this, 'FindMembersOrchLogGroup');
 
-    const findMembersOrch2 = new sfn.StateMachine(this, 'FindMembersOrch2', {
+    const findMembersOrch = new sfn.StateMachine(this, 'findMembersOrch', {
        stateMachineType: sfn.StateMachineType.EXPRESS,
        definition: definition,
        logs: {
@@ -105,13 +98,13 @@ export class LpdeCdkStack extends cdk.Stack {
       handler: 'find_members.lambda_handler',
       timeout: Duration.seconds(10),
       environment: {
-        STATE_MACHINE_ARN: findMembersOrch2.stateMachineArn
+        STATE_MACHINE_ARN: findMembersOrch.stateMachineArn
       }
     });
 
     mailChimpFindMembers.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
-      resources: [findMembersOrch2.stateMachineArn],
+      resources: [findMembersOrch.stateMachineArn],
       actions: ['states:StartSyncExecution']
     }));
 
