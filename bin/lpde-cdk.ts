@@ -6,5 +6,8 @@ import { Tags } from '@aws-cdk/core';
 
 const app = new cdk.App();
 const innominataDemo = new LpdeCdkStack(app, 'InnominataDemo');
-Tags.of(innominataDemo).add('activity', 'presales');
-Tags.of(innominataDemo).add('customer', 'Innominata');
+
+Tags.of(innominataDemo).add('Activity', 'presales');
+Tags.of(innominataDemo).add('Customer', 'innominata');
+Tags.of(innominataDemo).add('Project', 'innominata');
+Tags.of(innominataDemo).add('Author', 'Andrea Bisognin');
