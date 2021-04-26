@@ -16,7 +16,7 @@ export class LpdeCdkStack extends cdk.Stack {
 
     const mailChimpKey = ssm.StringParameter.fromStringParameterAttributes(this, 'MailChimpKey', {
       parameterName: '/mailchimp/ApiKey',
-      version: 2,
+      version: 1,
     }).stringValue;
 
     const mailChimpListId = ssm.StringParameter.fromStringParameterAttributes(this, 'mailChimpListId', {
